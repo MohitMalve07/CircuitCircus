@@ -17,6 +17,22 @@ public class PlayerKartAppearance : NetworkBehaviour
     [Tooltip("Child Transform containing the kart body and wheel renderers inside Player.prefab.")]
     [SerializeField] private Transform kartVisualRoot;
 
+    [Header("Minimap Marker")]
+    [Tooltip("Child Transform holding the dedicated top-down minimap marker.")]
+    [SerializeField] private Transform minimapMarker;
+
+    [Tooltip("SpriteRenderer displaying the directional minimap arrow on the MinimapOnly layer.")]
+    [SerializeField] private SpriteRenderer minimapMarkerRenderer;
+
+    [Tooltip("Marker colors matching each ordered kart variant (0 = Red, 1 = Orange, 2 = Green, 3 = White).")]
+    [SerializeField] private Color[] kartMarkerColors = new Color[]
+    {
+        new Color(1.00f, 0.23f, 0.19f, 1f),
+        new Color(1.00f, 0.58f, 0.00f, 1f),
+        new Color(0.18f, 0.85f, 0.44f, 1f),
+        new Color(0.98f, 0.98f, 1.00f, 1f)
+    };
+
     /// <summary>
     /// Server-assigned kart variant index replicated to all clients.
     /// Initialized as -1 until SpawnManager assigns the player's slot.
@@ -31,10 +47,14 @@ public class PlayerKartAppearance : NetworkBehaviour
 
     public int ActiveKartIndex => activeVariantIndex;
     public string ActiveKartName => kartVisualRoot != null ? kartVisualRoot.name : string.Empty;
+    public Transform MinimapMarker => minimapMarker;
+    public SpriteRenderer MinimapMarkerRenderer => minimapMarkerRenderer;
+    public Color ActiveMarkerColor => minimapMarkerRenderer != null ? minimapMarkerRenderer.color : Color.clear;
 
     private void Awake()
     {
         ResolveKartVisualRoot();
+        ResolveMinimapMarker();
     }
 
     public override void OnNetworkSpawn()
@@ -62,6 +82,14 @@ public class PlayerKartAppearance : NetworkBehaviour
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
         {
             ApplyKartVariant(KartIndex.Value);
+        }
+    }
+
+    private void LateUpdate()
+    {
+        if (minimapMarker != null)
+        {
+            minimapMarker.rotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
         }
     }
 
@@ -117,6 +145,33 @@ public class PlayerKartAppearance : NetworkBehaviour
         ApplyModelParts(kartVisualRoot, sourcePrefab.transform);
         kartVisualRoot.gameObject.name = sourcePrefab.name;
         activeVariantIndex = variantIndex;
+        ApplyMinimapMarkerColor(variantIndex, sourcePrefab);
+    }
+
+    private void ApplyMinimapMarkerColor(int variantIndex, GameObject sourcePrefab)
+    {
+        ResolveMinimapMarker();
+        if (minimapMarkerRenderer == null) return;
+
+        if (kartMarkerColors != null && variantIndex >= 0 && variantIndex < kartMarkerColors.Length)
+        {
+            minimapMarkerRenderer.color = kartMarkerColors[variantIndex];
+            return;
+        }
+
+        if (sourcePrefab != null)
+        {
+            Transform bodyTransform = FindDescendantByName(sourcePrefab.transform, "body");
+            if (bodyTransform != null && bodyTransform.TryGetComponent(out MeshRenderer bodyRenderer))
+            {
+                Material[] mats = bodyRenderer.sharedMaterials;
+                Material paintMat = mats != null && mats.Length > 1 ? mats[1] : bodyRenderer.sharedMaterial;
+                if (paintMat != null)
+                {
+                    minimapMarkerRenderer.color = paintMat.color;
+                }
+            }
+        }
     }
 
     private int ResolveVariantIndex(int rawIndex)
@@ -176,6 +231,19 @@ public class PlayerKartAppearance : NetworkBehaviour
         if (firstRenderer != null && firstRenderer.transform.parent != null && firstRenderer.transform.parent != transform)
         {
             kartVisualRoot = firstRenderer.transform.parent;
+        }
+    }
+
+    private void ResolveMinimapMarker()
+    {
+        if (minimapMarker == null)
+        {
+            minimapMarker = transform.Find("MinimapMarker");
+        }
+
+        if (minimapMarkerRenderer == null && minimapMarker != null)
+        {
+            minimapMarkerRenderer = minimapMarker.GetComponentInChildren<SpriteRenderer>(true);
         }
     }
 
