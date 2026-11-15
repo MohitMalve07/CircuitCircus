@@ -97,6 +97,12 @@ public class SpawnManager : NetworkBehaviour
             return;
         }
 
+        // Assign distinct kart appearance matching this player's slot before network spawn syncs it
+        if (playerInstance.TryGetComponent(out PlayerKartAppearance kartAppearance))
+        {
+            kartAppearance.AssignKartIndex(slotIndex);
+        }
+
         // Spawn as player object — this assigns ownership to the connecting client
         networkObject.SpawnAsPlayerObject(clientId);
 

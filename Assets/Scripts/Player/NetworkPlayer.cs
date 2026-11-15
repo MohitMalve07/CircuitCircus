@@ -47,9 +47,11 @@ public class NetworkPlayer : NetworkBehaviour
     [ServerRpc]
     private void SetUsernameServerRpc(string username, ServerRpcParams rpcParams = default)
     {
-        // Truncate if somehow too long for FixedString32Bytes
-        if (username.Length > 29)
-            username = username.Substring(0, 29);
+        username = NetworkUI.SanitizeUsername(username);
+        if (string.IsNullOrEmpty(username))
+        {
+            username = "Racer" + Random.Range(100, 999);
+        }
 
         Username.Value = new FixedString32Bytes(username);
         Debug.Log($"[NetworkPlayer] Server set username for Client {OwnerClientId}: '{username}'");
